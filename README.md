@@ -21,16 +21,19 @@ O projeto busca transformar a curadoria pessoal de filmes em uma experiência ma
 
 ---
 
-# 👥 Integrantes
-  Djalma Andrade| RM555530 | Desenvolvimento |
-  Felipe Carioba | RM558447 | Desenvolvimento |
-  Lucas Rodrigues | RM556323 | UX/UI |
-  Victor Hugo de Paula | RM554787 | UX/UI |
-  Otavio Santos de Lima Ferrao | RM 556452 | Produto |
-  
+## 👥 Integrantes
+
+| Integrante | RM | Função |
+|---|---|---|
+| Djalma Andrade | RM555530 | Desenvolvimento |
+| Felipe Carioba | RM558447 | Desenvolvimento |
+| Lucas Rodrigues | RM556323 | UX/UI |
+| Victor Hugo de Paula | RM554787 | UX/UI |
+| Otavio Santos de Lima Ferrao | RM556452 | Produto |
+
 ---
 
-# 🎯 Problema
+## 🎯 Problema
 
 Atualmente, a experiência de descobrir, avaliar e discutir filmes é fragmentada entre diversas plataformas.
 
@@ -49,9 +52,9 @@ Além disso, grande parte das plataformas existentes trabalha principalmente com
 
 ---
 
-# 💡 Solução
+## 💡 Solução
 
-O CINEA propõe centralizar toda essa experiência em um único aplicativo.
+O **CINEA** propõe centralizar toda essa experiência em um único aplicativo.
 
 A jornada do usuário pode acontecer inteiramente dentro da plataforma:
 
@@ -69,3 +72,40 @@ Avaliar
 Organizar
     ↓
 Compartilhar
+```
+
+Dessa forma, o usuário não precisa alternar entre diferentes aplicativos para pesquisar títulos, consultar opiniões, encontrar onde assistir e organizar seus filmes favoritos.
+
+O CINEA reúne essas funcionalidades em uma experiência única, visual e integrada.
+
+---
+
+## 🎨 Protótipo no Figma
+
+A interface e a identidade visual do **CINEA** foram desenvolvidas e prototipadas utilizando o **Figma**.
+
+O protótipo apresenta as principais telas e fluxos planejados para o aplicativo, permitindo visualizar a experiência do usuário antes da implementação em React Native.
+
+### Telas desenvolvidas
+
+- Tela de Login;
+- Tela Inicial;
+- Tela de Filme;
+- Tela de Avaliações;
+- Tela de Avaliação;
+- Tela de Pesquisa;
+- Tela de Usuário;
+- Menu do Usuário;
+- Tela de Tier List.
+
+### Acessar o protótipo
+
+<p align="center">
+  <a href="https://www.figma.com/design/YkjmqKSaibpFj0yNBNTiOU/CINEA---Mobile-Development-and-IoT?node-id=0-1&p=f">
+    <strong>🎨 Visualizar protótipo no Figma</strong>
+  </a>
+</p>
+
+> O protótipo representa a identidade visual e os fluxos iniciais do CINEA e poderá sofrer alterações durante o desenvolvimento da aplicação.
+
+---
