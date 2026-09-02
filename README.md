@@ -106,7 +106,7 @@ O desenvolvimento mobile será conduzido utilizando **React Native** com **Expo*
 **Instruções Básicas para rodar o projeto:**
 ```bash
 # Clone o repositório
-git clone [https://github.com/djxlma/Cinea_App](https://github.com/djxlma/Cinea_App)
+git clone https://github.com/djxlma/Cinea_App
 
 # Acesse o diretório
 cd cinea
