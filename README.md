@@ -412,55 +412,71 @@ Não há suíte automatizada documentada neste momento.
 ### 🔐 Autenticação
 
 <p align="center">
-  <img src="./cinea/docs/evidences/login.png" alt="Tela de Login do CINEA" width="280" />
-  <img src="./cinea/docs/evidences/cadastro.png" alt="Tela de Cadastro do CINEA" width="280" />
+  <img src="./cinea/docs/evidences/login.png" alt="Tela de Login do CINEA" height="600" />
+  &nbsp;&nbsp;
+  <img src="./cinea/docs/evidences/cadastro.png" alt="Tela de Cadastro do CINEA" height="600" />
 </p>
 
 ### 🏠 Descoberta de Filmes
 
 <p align="center">
-  <img src="./cinea/docs/evidences/home.png" alt="Tela Home do CINEA" width="260" />
-  <img src="./cinea/docs/evidences/search.png" alt="Tela de Pesquisa do CINEA" width="260" />
-  <img src="./cinea/docs/evidences/movie-details.png" alt="Detalhes de Filme do CINEA" width="260" />
+  <img src="./cinea/docs/evidences/home.png" alt="Tela Home do CINEA" height="560" />
+  &nbsp;
+  <img src="./cinea/docs/evidences/search.png" alt="Tela de Pesquisa do CINEA" height="560" />
+  &nbsp;
+  <img src="./cinea/docs/evidences/movie-details.png" alt="Detalhes de Filme do CINEA" height="560" />
 </p>
 
 ### ⭐ Avaliações
 
 <p align="center">
-  <img src="./cinea/docs/evidences/create-review.png" alt="Criação de Avaliação" width="260" />
-  <img src="./cinea/docs/evidences/reviews.png" alt="Avaliações do Filme" width="260" />
-  <img src="./cinea/docs/evidences/my-reviews.png" alt="Avaliações Publicadas pelo Usuário" width="260" />
+  <img src="./cinea/docs/evidences/create-review.png" alt="Criação de Avaliação" height="560" />
+  &nbsp;
+  <img src="./cinea/docs/evidences/reviews.png" alt="Avaliações do Filme" height="560" />
+  &nbsp;
+  <img src="./cinea/docs/evidences/my-reviews.png" alt="Avaliações Publicadas pelo Usuário" height="560" />
 </p>
 
 ### 👤 Perfil
 
 <p align="center">
-  <img src="./cinea/docs/evidences/profile.png" alt="Perfil do Usuário no CINEA" width="300" />
+  <img src="./cinea/docs/evidences/profile.png" alt="Perfil do Usuário no CINEA" height="600" />
 </p>
 
 ### 🏆 Tier Lists
 
 <p align="center">
-  <img src="./cinea/docs/evidences/tier-list-creating.png" alt="Estado vazio da Tier List com opção de criar nova lista" width="260" />
-  <img src="./cinea/docs/evidences/tier-list-editor.png" alt="Criação e edição de Tier List" width="260" />
-  <img src="./cinea/docs/evidences/tier-lists.png" alt="Tela principal de Tier Lists" width="260" />
+  <img src="./cinea/docs/evidences/tier-list-creating.png" alt="Estado vazio da Tier List" height="560" />
+  &nbsp;
+  <img src="./cinea/docs/evidences/tier-list-editor.png" alt="Criação e edição de Tier List" height="560" />
+  &nbsp;
+  <img src="./cinea/docs/evidences/tier-lists.png" alt="Tela principal de Tier Lists" height="560" />
 </p>
 
 ### 🗄️ Persistência no Supabase
 
-<p align="center">
-  <img src="./cinea/docs/evidences/supabase-reviews.png" alt="Tabela Reviews no Supabase" width="420" />
-  <img src="./cinea/docs/evidences/supabase-tier-lists.png" alt="Tabela Tier Lists no Supabase" width="420" />
-</p>
+#### Reviews
 
 <p align="center">
-  <img src="./cinea/docs/evidences/supabase-tier-list-items.png" alt="Tabela Tier List Items no Supabase" width="700" />
+  <img src="./cinea/docs/evidences/supabase-reviews.png" alt="Tabela Reviews no Supabase" width="850" />
+</p>
+
+#### Tier Lists
+
+<p align="center">
+  <img src="./cinea/docs/evidences/supabase-tier-lists.png" alt="Tabela Tier Lists no Supabase" width="850" />
+</p>
+
+#### Itens das Tier Lists
+
+<p align="center">
+  <img src="./cinea/docs/evidences/supabase-tier-list-items.png" alt="Tabela Tier List Items no Supabase" width="850" />
 </p>
 
 ### 🔐 Segurança / RLS
 
 <p align="center">
-  <img src="./cinea/docs/evidences/supabase-rls.png" alt="Row Level Security no Supabase" width="700" />
+  <img src="./cinea/docs/evidences/supabase-rls.png" alt="Row Level Security no Supabase" width="850" />
 </p>
 
 > As capturas do Supabase devem ocultar informações sensíveis, como credenciais, tokens, chaves e dados pessoais.
