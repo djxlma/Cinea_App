@@ -6,10 +6,11 @@ import { colors } from '../tokens/colors';
 type UserAvatarProps = {
   size: number;
   onPress?: () => void;
+  accessibilityLabel?: string;
   source?: ImageSourcePropType | string | null;
 };
 
-export function UserAvatar({ size, onPress, source }: UserAvatarProps) {
+export function UserAvatar({ size, onPress, source, accessibilityLabel = 'Menu do usuário' }: UserAvatarProps) {
   const avatar = source ? (
     <Image
       source={typeof source === 'string' ? { uri: source } : source}
@@ -25,7 +26,7 @@ export function UserAvatar({ size, onPress, source }: UserAvatarProps) {
   if (!onPress) return avatar;
 
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel="Menu do usuário" onPress={onPress}>
+    <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel} onPress={onPress}>
       {avatar}
     </Pressable>
   );

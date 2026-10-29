@@ -1,9 +1,17 @@
+import { forwardRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { CineaIcon } from './CineaIcon';
-import { colors } from '../tokens/colors';
-import { typography } from '../tokens/typography';
+import { colors, semanticColors } from '../tokens/colors';
+import { typography, semanticTypography } from '../tokens/typography';
+import { semanticSpacing } from '../tokens/spacing';
+import { radius } from '../tokens/radius';
+import { sizes } from '../tokens/sizes';
+import { states } from '../tokens/states';
 
 type FloatingSearchBarProps = {
+  appearance?: 'legacy' | 'semantic';
+  transparentBackground?: boolean;
+  flat?: boolean;
   value?: string;
   onChangeText?: (value: string) => void;
   onPress?: () => void;
@@ -11,7 +19,8 @@ type FloatingSearchBarProps = {
   placeholder?: string;
 };
 
-export function FloatingSearchBar({ value, onChangeText, onPress, onFilter, placeholder = 'Pesquisar título' }: FloatingSearchBarProps) {
+export const FloatingSearchBar = forwardRef<TextInput, FloatingSearchBarProps>(function FloatingSearchBar({ appearance = 'legacy', transparentBackground = false, flat = false, value, onChangeText, onPress, onFilter, placeholder = 'Pesquisar título' }, ref) {
+  if (appearance === 'semantic') return <SemanticSearchBar ref={ref} flat={flat} transparentBackground={transparentBackground} value={value} onChangeText={onChangeText} onPress={onPress} onFilter={onFilter} placeholder={placeholder} />;
   return (
     <View style={styles.bar}>
       {onPress ? (
@@ -21,6 +30,7 @@ export function FloatingSearchBar({ value, onChangeText, onPress, onFilter, plac
         </Pressable>
       ) : (
         <TextInput
+          ref={ref}
           accessibilityLabel="Pesquisar títulos"
           onChangeText={onChangeText}
           placeholder={placeholder}
@@ -36,7 +46,45 @@ export function FloatingSearchBar({ value, onChangeText, onPress, onFilter, plac
       ) : null}
     </View>
   );
-}
+});
+
+const SemanticSearchBar = forwardRef<TextInput, FloatingSearchBarProps>(function SemanticSearchBar({ transparentBackground = false, flat = false, value, onChangeText, onPress, onFilter, placeholder }, ref) {
+  const [focused, setFocused] = useState(false);
+  const contents = <>
+    <CineaIcon name="search" size={20} color={semanticColors.text.secondary} />
+    <Text style={semanticStyles.placeholder}>{placeholder}</Text>
+  </>;
+  if (onPress) return <Pressable accessibilityRole="button" accessibilityLabel="Pesquisar filmes" onPress={onPress}
+    style={({ pressed }) => [semanticStyles.bar, semanticStyles.trigger, flat && semanticStyles.flatBar, transparentBackground && semanticStyles.transparentBar,
+      pressed && (transparentBackground || flat ? semanticStyles.transparentPressed : semanticStyles.pressed)]}>{contents}</Pressable>;
+  return <View style={[semanticStyles.bar, transparentBackground && semanticStyles.transparentBar, focused && semanticStyles.focused]}>
+    <View accessible={false} pointerEvents="none" style={semanticStyles.searchIcon}><CineaIcon name="search" size={20} color={semanticColors.text.secondary} /></View>
+    <TextInput ref={ref} accessibilityLabel="Pesquisar filmes" value={value} onChangeText={onChangeText} placeholder={placeholder}
+      placeholderTextColor={semanticColors.text.muted} autoCorrect={false} returnKeyType="search"
+      onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} style={semanticStyles.input} />
+    {value && onChangeText ? <Pressable accessibilityRole="button" accessibilityLabel="Limpar pesquisa" onPress={() => onChangeText('')}
+      style={({ pressed }) => [semanticStyles.iconAction, pressed && semanticStyles.pressed]}>
+      <Text style={semanticStyles.clear}>×</Text>
+    </Pressable> : null}
+    {onFilter ? <Pressable accessibilityRole="button" accessibilityLabel="Filtros" onPress={onFilter}
+      style={({ pressed }) => [semanticStyles.iconAction, pressed && semanticStyles.pressed]}><CineaIcon name="filter" size={20} /></Pressable> : null}
+  </View>;
+});
+
+const semanticStyles = StyleSheet.create({
+  bar: { minHeight: sizes.inputMinHeight, flexDirection: 'row', alignItems: 'center', backgroundColor: semanticColors.surface.default, borderWidth: states.focus.borderWidth, borderColor: semanticColors.border.subtle, borderRadius: radius.control },
+  trigger: { gap: semanticSpacing.md, paddingHorizontal: semanticSpacing.lg, paddingVertical: semanticSpacing.md },
+  placeholder: { ...semanticTypography.body, color: semanticColors.text.secondary, flex: 1 },
+  searchIcon: { marginLeft: semanticSpacing.md },
+  input: { ...semanticTypography.body, color: semanticColors.text.primary, flex: 1, minWidth: 0, minHeight: sizes.inputMinHeight, paddingHorizontal: semanticSpacing.md, paddingVertical: semanticSpacing.md },
+  focused: { borderColor: semanticColors.border.focus },
+  transparentBar: { backgroundColor: 'transparent' },
+  flatBar: { borderWidth: 1, borderRadius: radius.control, overflow: 'hidden', elevation: 0, shadowOpacity: 0 },
+  transparentPressed: { borderColor: semanticColors.border.strong },
+  iconAction: { minWidth: sizes.touchTargetMin, minHeight: sizes.touchTargetMin, alignItems: 'center', justifyContent: 'center', borderRadius: radius.control },
+  clear: { ...semanticTypography.sectionTitle, color: semanticColors.text.secondary },
+  pressed: { backgroundColor: states.pressed.background },
+});
 
 const styles = StyleSheet.create({
   bar: {

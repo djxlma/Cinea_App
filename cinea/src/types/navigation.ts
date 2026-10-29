@@ -10,7 +10,7 @@ export type AuthStackParamList = {
 
 export type AppTabParamList = {
   Home: undefined;
-  Search: undefined;
+  Search: { autoFocus?: boolean } | undefined;
   TierLists: undefined;
   Profile: undefined;
 };
@@ -19,11 +19,14 @@ export type RootStackParamList = {
   Auth: undefined;
   App: NavigatorScreenParams<AppTabParamList> | undefined;
   UserMenu: undefined;
-  MovieDetails: { movieTitle: string };
-  Reviews: { movieTitle: string };
+  AccountProfile: undefined;
+  EditProfile: undefined;
+  Settings: undefined;
+  MovieDetails: { movieId?: string; movieTitle?: string };
+  Reviews: { movieId?: string; movieTitle: string };
   CurrentUserReviews: undefined;
   SelectMovieForReview: undefined;
-  CreateReview: { movieTitle: string };
+  CreateReview: { movieId?: string; movieTitle: string };
   CreateEditTierList: { tierListId?: string };
 };
 

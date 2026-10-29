@@ -1,9 +1,12 @@
+import { useEffect, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { ImageSourcePropType } from 'react-native';
 import { CineaIcon } from './CineaIcon';
-import { colors } from '../tokens/colors';
+import { colors, semanticColors } from '../tokens/colors';
+import { radius } from '../tokens/radius';
 
 type PosterTileProps = {
+  appearance?: 'legacy' | 'semantic';
   width: number;
   height: number;
   onPress?: () => void;
@@ -13,17 +16,24 @@ type PosterTileProps = {
   backgroundColor?: string;
   source?: ImageSourcePropType;
   posterSource?: ImageSourcePropType;
+  posterUrl?: string | null;
   label?: string;
   showLabel?: boolean;
 };
 
-export function PosterTile({ width, height, onPress, rating, showRating = true, add = false, backgroundColor, source, posterSource, label, showLabel = false }: PosterTileProps) {
-  const resolvedPosterSource = posterSource ?? source ?? require('../../assets/poster-placeholder.png');
+export function PosterTile({ appearance = 'legacy', width, height, onPress, rating, showRating = true, add = false, backgroundColor, source, posterSource, posterUrl, label, showLabel = false }: PosterTileProps) {
+  const [failedPosterUrl, setFailedPosterUrl] = useState<string | null>(null);
+  useEffect(() => { setFailedPosterUrl(null); }, [posterUrl]);
+  const resolvedPosterSource = posterSource
+    ?? (posterUrl && posterUrl !== failedPosterUrl ? { uri: posterUrl } : null)
+    ?? source
+    ?? require('../../assets/poster-placeholder.png');
 
   const content = (
-    <View style={[styles.poster, { width, height, backgroundColor: backgroundColor ?? colors.surface }]}> 
-      <Image source={resolvedPosterSource} resizeMode="cover" style={styles.image} />
-      <View style={styles.overlay} />
+    <View style={[styles.poster, appearance === 'semantic' && styles.semanticPoster, { width, height, backgroundColor: backgroundColor ?? (appearance === 'semantic' ? semanticColors.surface.subtle : colors.surface) }]}>
+      <Image source={resolvedPosterSource} resizeMode="cover" style={styles.image}
+        onError={() => { if (!posterSource && posterUrl) setFailedPosterUrl(posterUrl); }} />
+      {appearance === 'legacy' ? <View style={styles.overlay} /> : null}
       {showRating && rating !== undefined ? (
         <View style={styles.ratingBadge}>
           <Text style={styles.ratingStar}>★</Text>
@@ -49,6 +59,7 @@ export function PosterTile({ width, height, onPress, rating, showRating = true, 
 }
 
 const styles = StyleSheet.create({
+  semanticPoster: { borderWidth: 0, borderRadius: radius.poster },
   poster: {
     overflow: 'hidden',
     alignItems: 'center',

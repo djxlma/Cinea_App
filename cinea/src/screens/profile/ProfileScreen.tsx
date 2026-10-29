@@ -1,22 +1,29 @@
 import { useCallback, useEffect, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from '@react-navigation/native';
-import { ScrollView, Share, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { FlatList, Share, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { CineaScreen } from '../../components/CineaScreen';
-import { CineaIcon } from '../../components/CineaIcon';
-import { PosterTile } from '../../components/PosterTile';
+import { CineaIconButton } from '../../components/CineaIconButton';
+import { CineaState } from '../../components/CineaState';
+import { MoviePosterCard } from '../../components/MoviePosterCard';
+import { SectionTitle } from '../../components/SectionTitle';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { UserAvatar } from '../../components/UserAvatar';
-import { demoMovies } from '../../data/mock/demoContent';
+import { getReviewedMovieCards } from '../../services/movieResolver';
+import { useReviewMovies } from '../../hooks/useReviewMovies';
 import { getCurrentProfile, getSignedAvatarUrl, type ProfileRecord, updateCurrentProfile, uploadCurrentUserAvatar } from '../../services/profile';
 import { getCurrentUserReviews, type ReviewRecord } from '../../services/reviews';
 import { supabase } from '../../lib/supabase';
-import { colors } from '../../tokens/colors';
-import { spacing } from '../../tokens/spacing';
-import type { AppTabScreenProps } from '../../types/navigation';
+import { semanticColors } from '../../tokens/colors';
+import { semanticSpacing } from '../../tokens/spacing';
+import { semanticTypography } from '../../tokens/typography';
+import { sizes } from '../../tokens/sizes';
+import type { RootScreenProps } from '../../types/navigation';
 
-type Props = AppTabScreenProps<'Profile'>;
+type Props = {
+  navigation: Pick<RootScreenProps<'AccountProfile'>['navigation'], 'navigate' | 'goBack' | 'canGoBack'>;
+};
 
 export function ProfileScreen({ navigation }: Props) {
   const [profile, setProfile] = useState<ProfileRecord | null>(null);
@@ -25,12 +32,14 @@ export function ProfileScreen({ navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const [reviewedMovies, setReviewedMovies] = useState<typeof demoMovies>([]);
+  const [reviews, setReviews] = useState<ReviewRecord[]>([]);
+  const resolvedMovies = useReviewMovies(reviews);
+  const reviewedMovies = getReviewedMovieCards(reviews, resolvedMovies);
+  const [retryCount, setRetryCount] = useState(0);
   const { width } = useWindowDimensions();
-  const posterWidth = width * 0.37;
-  const posterHeight = posterWidth * 1.52;
+  const posterWidth = Math.min(160, (width - semanticSpacing.xl * 2) * 0.38);
 
-  const loadProfile = useCallback(async () => {
+  const loadProfile = useCallback(async (isActive: () => boolean) => {
     try {
       setLoading(true);
       setError(null);
@@ -40,36 +49,39 @@ export function ProfileScreen({ navigation }: Props) {
         getCurrentUserReviews(),
       ]);
 
-      const uniqueMovieIds = [...new Set(currentReviews.map((review) => review.movie_id))];
-      const nextReviewedMovies = uniqueMovieIds
-        .map((movieId) => demoMovies.find((movie) => movie.id === movieId))
-        .filter((movie): movie is (typeof demoMovies)[number] => Boolean(movie));
-
+      if (!isActive()) return;
       setProfile(currentProfile);
-      setReviewedMovies(nextReviewedMovies);
-      setAvatarUri(await getSignedAvatarUrl(currentProfile?.avatar_url ?? null));
+      setReviews(currentReviews);
+      setLoading(false);
+      const uri = await getSignedAvatarUrl(currentProfile?.avatar_url ?? null).catch(() => null);
+      if (isActive()) setAvatarUri(uri);
     } catch (e) {
+      if (!isActive()) return;
       setError('Não foi possível carregar seu perfil.');
       setProfile(null);
       setAvatarUri(null);
-      setReviewedMovies([]);
+      setReviews([]);
     } finally {
-      setLoading(false);
+      if (isActive()) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
+    let active = true;
     async function loadAuthEmail() {
       const { data } = await supabase.auth.getUser();
-      setAuthEmail(data.user?.email ?? '');
+      if (active) setAuthEmail(data.user?.email ?? '');
     }
 
-    void loadAuthEmail();
+    void loadAuthEmail().catch(() => {});
+    return () => { active = false; };
   }, []);
 
   useFocusEffect(useCallback(() => {
-    void loadProfile();
-  }, [loadProfile]));
+    let active = true;
+    void loadProfile(() => active);
+    return () => { active = false; };
+  }, [loadProfile, retryCount]));
 
   const normalizedUsername = profile?.username?.trim().replace(/^@/, '') ?? '';
   const emailUser = authEmail.split('@')[0]?.replace(/[^a-zA-Z0-9._-]/g, '') || 'usuario';
@@ -121,117 +133,50 @@ export function ProfileScreen({ navigation }: Props) {
   }, []);
 
   return (
-    <CineaScreen
-      contentContainerStyle={styles.content}
-      footer={(
-        <View style={styles.footerRow}>
-          <PrimaryButton label="Solicitar conexão" variant="orange" onPress={() => {}} containerStyle={styles.connectionButton} />
-          <PrimaryButton label="" variant="orange" iconOnly icon={<CineaIcon name="share" size={31} />} onPress={() => void Share.share({ message: shareMessage })} />
-        </View>
-      )}
-    >
-      <ScreenHeader onBack={() => navigation.navigate('Home')} showAvatar onAvatarPress={() => navigation.navigate('UserMenu')} />
-      {loading ? (
-        <Text style={styles.statusText}>Carregando perfil...</Text>
-      ) : error ? (
-        <Text style={styles.statusText}>{error}</Text>
-      ) : (
-        <>
+    <CineaScreen appearance="semantic" maxContentWidth={640} contentContainerStyle={styles.content}>
+      <ScreenHeader appearance="semantic" title="Meu Perfil" onBack={() => {
+        if (navigation.canGoBack()) navigation.goBack();
+        else navigation.navigate('App', { screen: 'Home' });
+      }}
+        rightAction={<View style={styles.headerActions}>
+          <CineaIconButton icon="share" accessibilityLabel="Compartilhar perfil" onPress={() => void Share.share({ message: shareMessage })} />
+          <UserAvatar size={sizes.touchTargetMin} source={avatarUri ? { uri: avatarUri } : null} onPress={() => navigation.navigate('UserMenu')} />
+        </View>} />
+      {loading ? <CineaState variant="loading" size="screen" message="Carregando perfil..." />
+        : error ? <CineaState variant="error" size="screen" title={error} actionLabel="Tentar novamente" onAction={() => setRetryCount((value) => value + 1)} /> : <>
           <View style={styles.profile}>
-            <UserAvatar size={180} source={avatarUri ? { uri: avatarUri } : null} onPress={() => void handlePickAvatar()} />
-            {uploadingAvatar ? <Text style={styles.uploadingText}>Enviando foto...</Text> : null}
-            <Text style={styles.name}>{displayName}</Text>
-            <Text style={styles.username}>@{username}</Text>
+            <UserAvatar size={104} accessibilityLabel="Alterar foto do perfil" source={avatarUri ? { uri: avatarUri } : null} onPress={() => void handlePickAvatar()} />
+            {uploadingAvatar ? <Text accessibilityLiveRegion="polite" style={styles.uploadingText}>Enviando foto...</Text> : null}
+            <View style={styles.identity}>
+              <Text accessibilityRole="header" style={styles.name}>{displayName}</Text>
+              <Text style={styles.username}>@{username}</Text>
+            </View>
             <Text style={styles.bio}>{bio}</Text>
+            <PrimaryButton label="Editar perfil" variant="secondary" secondaryTone="wine" onPress={() => navigation.navigate('EditProfile')} />
           </View>
-          <View style={styles.divider} />
-          <Text style={styles.sectionTitle}>Avaliados</Text>
-          {reviewedMovies.length === 0 ? (
-            <Text style={styles.emptyText}>Você ainda não avaliou nenhum filme.</Text>
-          ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.movieRow}>
-              {reviewedMovies.map((movie) => (
-                <PosterTile
-                  key={movie.id}
-                  width={posterWidth}
-                  height={posterHeight}
-                  posterSource={movie.posterSource}
-                  backgroundColor={movie.posterColor}
-                  showRating={false}
-                  onPress={() => navigation.navigate('MovieDetails', { movieTitle: movie.title })}
-                />
-              ))}
-            </ScrollView>
-          )}
-        </>
-      )}
+          <View style={styles.reviewedSection}>
+            <SectionTitle appearance="semantic" title="Avaliados" />
+            {reviewedMovies.length === 0 ? <CineaState variant="empty" size="section" title="Você ainda não avaliou nenhum filme." /> : (
+              <FlatList horizontal data={reviewedMovies} keyExtractor={(movie) => movie.id} showsHorizontalScrollIndicator={false}
+                initialNumToRender={5} windowSize={5} contentContainerStyle={styles.movieRow}
+                renderItem={({ item: movie }) => <MoviePosterCard width={posterWidth} title={movie.title} posterUrl={movie.posterUrl}
+                  onPress={() => navigation.navigate('MovieDetails', { movieId: movie.id, movieTitle: movie.title })} />} />
+            )}
+          </View>
+        </>}
     </CineaScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  content: {
-    paddingTop: 16,
-    gap: spacing.md,
-  },
-  profile: {
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 12,
-    marginBottom: 4,
-  },
-  name: {
-    color: colors.text,
-    fontSize: 42,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  username: {
-    color: colors.secondary,
-    fontSize: 22,
-    fontWeight: '600',
-  },
-  bio: {
-    color: colors.text,
-    fontSize: 17,
-    lineHeight: 24,
-    textAlign: 'left',
-    marginTop: spacing.sm,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#B28B70',
-    marginBottom: 4,
-  },
-  sectionTitle: {
-    color: colors.text,
-    fontSize: 24,
-    fontWeight: '600',
-  },
-  movieRow: {
-    gap: spacing.md,
-    paddingRight: 16,
-  },
-  footerRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  connectionButton: {
-    flex: 1,
-  },
-  statusText: {
-    color: colors.text,
-    fontSize: 16,
-    marginTop: spacing.md,
-  },
-  emptyText: {
-    color: colors.text,
-    fontSize: 16,
-    marginTop: spacing.sm,
-  },
-  uploadingText: {
-    color: colors.secondary,
-    fontSize: 13,
-    marginTop: -4,
-  },
+  content: { gap: semanticSpacing.section },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: semanticSpacing.xs },
+  profile: { alignItems: 'center', gap: semanticSpacing.lg },
+  identity: { alignSelf: 'stretch', gap: semanticSpacing.xs },
+  name: { ...semanticTypography.title, color: semanticColors.text.primary, textAlign: 'center' },
+  username: { ...semanticTypography.bodySmall, color: semanticColors.text.secondary, textAlign: 'center' },
+  bio: { ...semanticTypography.body, color: semanticColors.text.primary, textAlign: 'center', alignSelf: 'stretch' },
+  reviewedSection: { gap: semanticSpacing.lg },
+  movieRow: { gap: semanticSpacing.md, paddingRight: semanticSpacing.xs },
+  uploadingText: { ...semanticTypography.bodySmall, color: semanticColors.text.secondary },
 });

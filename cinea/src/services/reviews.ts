@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { getEquivalentMovieIds, resolveTmdbId } from './movieResolver';
 
 export type ReviewRecord = {
   id: string;
@@ -33,24 +34,36 @@ async function getCurrentUserId() {
 }
 
 export async function getReviewsByMovie(movieId: string): Promise<ReviewRecord[]> {
-  if (!movieId) {
-    return [];
-  }
+  return getReviewsByMovieIds([movieId]);
+}
+
+export function deduplicateReviews(reviews: ReviewRecord[]): ReviewRecord[] {
+  return [...new Map(reviews.map((review) => [review.id, review])).values()]
+    .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+}
+
+export async function getReviewsByMovieIds(movieIds: string[]): Promise<ReviewRecord[]> {
+  const ids = [...new Set(movieIds.flatMap(getEquivalentMovieIds))];
+  if (ids.length === 0) return [];
 
   const { data, error } = await supabase
     .from('reviews')
     .select('*')
-    .eq('movie_id', movieId)
+    .in('movie_id', ids)
     .order('created_at', { ascending: false });
 
   if (error) {
     throw error;
   }
 
-  return (data ?? []) as ReviewRecord[];
+  return deduplicateReviews((data ?? []) as ReviewRecord[]);
 }
 
 export async function createReview(input: ReviewInput): Promise<ReviewRecord> {
+  const tmdbId = resolveTmdbId(input.movieId);
+  if (tmdbId === null || !input.movieTitle.trim()) {
+    throw new Error('Filme inválido para avaliação.');
+  }
   const userId = await getCurrentUserId();
 
   if (!userId) {
@@ -62,8 +75,8 @@ export async function createReview(input: ReviewInput): Promise<ReviewRecord> {
     .insert([
       {
         user_id: userId,
-        movie_id: input.movieId,
-        movie_title: input.movieTitle,
+        movie_id: String(tmdbId),
+        movie_title: input.movieTitle.trim(),
         rating: input.rating,
         content: input.content,
       },
