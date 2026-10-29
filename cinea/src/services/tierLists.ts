@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import type { TierRank } from '../types/content';
+import { prepareTierItems } from './tierListItems';
 
 export type TierListRecord = {
   id: string;
@@ -26,6 +27,7 @@ export type TierListInput = {
 };
 
 export type TierListItemInput = {
+  id?: string;
   movieId: string;
   movieTitle: string;
   tier: TierRank;
@@ -195,37 +197,37 @@ export async function saveTierListItems(tierListId: string, items: TierListItemI
     throw new Error('Você não tem permissão para alterar esta Tier List.');
   }
 
-  const { error: deleteError } = await supabase
-    .from('tier_list_items')
-    .delete()
-    .eq('tier_list_id', tierListId);
+  const existing = await getTierListItems(tierListId);
+  const prepared = prepareTierItems(items, existing);
+  const payload = prepared.map((item) => ({
+    ...(item.id ? { id: item.id } : {}),
+    tier_list_id: tierListId,
+    movie_id: item.movieId,
+    movie_title: item.movieTitle.trim(),
+    tier: item.tier,
+    position: item.position,
+  }));
+  const additions = payload.filter((item) => !item.id);
+  const retained = payload.filter((item) => item.id);
+  const retainedIds = new Set(retained.map((item) => item.id));
+  const removedIds = existing.filter((item) => !retainedIds.has(item.id)).map((item) => item.id);
+  const saved: TierListItemRecord[] = [];
 
-  if (deleteError) {
-    throw deleteError;
+  // No delete-all/reinsert: persist additions first, and remove only explicit omissions last.
+  if (additions.length) {
+    const { data, error } = await supabase.from('tier_list_items').insert(additions).select();
+    if (error) throw new Error('Não foi possível adicionar os filmes. Os itens anteriores não foram removidos. Tente salvar novamente.');
+    if (!data || data.length !== additions.length) throw new Error('Não foi possível confirmar os novos itens. Reabra a lista para conferir.');
+    saved.push(...data as TierListItemRecord[]);
   }
-
-  if (!items.length) {
-    return [];
+  if (retained.length) {
+    const { data, error } = await supabase.from('tier_list_items').upsert(retained, { onConflict: 'id' }).select();
+    if (error || !data || data.length !== retained.length) throw new Error('Não foi possível atualizar todos os itens. Nenhum item antigo foi removido. Tente salvar novamente.');
+    saved.push(...data as TierListItemRecord[]);
   }
-
-  const payload = items
-    .map((item) => ({
-      tier_list_id: tierListId,
-      movie_id: item.movieId,
-      movie_title: item.movieTitle,
-      tier: item.tier,
-      position: item.position,
-    }))
-    .sort((a, b) => a.position - b.position);
-
-  const { data, error } = await supabase
-    .from('tier_list_items')
-    .insert(payload)
-    .select();
-
-  if (error) {
-    throw error;
+  if (removedIds.length) {
+    const { error } = await supabase.from('tier_list_items').delete().eq('tier_list_id', tierListId).in('id', removedIds);
+    if (error) throw new Error('As alterações foram gravadas parcialmente, mas não foi possível remover todos os itens retirados. Tente salvar novamente.');
   }
-
-  return (data ?? []) as TierListItemRecord[];
+  return saved.sort((a, b) => a.position - b.position);
 }

@@ -1,13 +1,13 @@
 import { useCallback, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { CineaScreen } from '../../components/CineaScreen';
-import { PosterTile } from '../../components/PosterTile';
-import { RatingStars } from '../../components/RatingStars';
+import { ReviewCard } from '../../components/ReviewCard';
+import { CineaState } from '../../components/CineaState';
 import { ScreenHeader } from '../../components/ScreenHeader';
-import { demoMovies } from '../../data/mock/demoContent';
-import { colors } from '../../tokens/colors';
-import { spacing } from '../../tokens/spacing';
+import { getMovieIdentityKey } from '../../services/movieResolver';
+import { useReviewMovies } from '../../hooks/useReviewMovies';
+import { semanticSpacing } from '../../tokens/spacing';
 import { getCurrentUserReviews, type ReviewRecord } from '../../services/reviews';
 import type { RootScreenProps } from '../../types/navigation';
 
@@ -18,97 +18,46 @@ export function CurrentUserReviewsScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadReviews = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const nextReviews = await getCurrentUserReviews();
-      setReviews(nextReviews);
-    } catch (e) {
-      setError('Não foi possível carregar suas avaliações.');
-      setReviews([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
+  const movies = useReviewMovies(reviews);
+  const [retryCount, setRetryCount] = useState(0);
   useFocusEffect(useCallback(() => {
-    void loadReviews();
-  }, [loadReviews]));
+    let active = true;
+    setLoading(true);
+    setError(null);
+    void getCurrentUserReviews()
+      .then((result) => { if (active) setReviews(result); })
+      .catch(() => { if (active) setError('Não foi possível carregar suas avaliações.'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [retryCount]));
 
   return (
-    <CineaScreen contentContainerStyle={styles.pageContent}>
-      <ScreenHeader title="Minhas avaliações" onBack={() => navigation.goBack()} />
+    <CineaScreen appearance="semantic" maxContentWidth={640} contentContainerStyle={styles.pageContent}>
+      <ScreenHeader appearance="semantic" title="Minhas avaliações" titleNumberOfLines={2} onBack={() => navigation.goBack()} />
       {loading ? (
-        <Text style={styles.status}>Carregando avaliações...</Text>
+        <CineaState variant="loading" size="screen" message="Carregando avaliações..." />
       ) : error ? (
-        <Text style={styles.status}>{error}</Text>
+        <CineaState variant="error" size="screen" title={error} actionLabel="Tentar novamente" onAction={() => setRetryCount((value) => value + 1)} />
       ) : reviews.length === 0 ? (
-        <Text style={styles.status}>Você ainda não publicou nenhuma avaliação.</Text>
+        <CineaState variant="empty" size="screen" title="Você ainda não publicou nenhuma avaliação." />
       ) : (
-        <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+        <View style={styles.list}>
           {reviews.map((review) => {
-            const movie = demoMovies.find((item) => item.id === review.movie_id);
-            const movieTitle = review.movie_title || movie?.title || 'Filme';
+            const movie = movies[getMovieIdentityKey(review.movie_id)];
+            const movieTitle = movie?.title?.trim() || review.movie_title || 'Filme';
 
             return (
-              <View key={review.id} style={styles.reviewRow}>
-                <PosterTile
-                  width={78}
-                  height={110}
-                  posterSource={movie?.posterSource ?? require('../../../assets/poster-placeholder.png')}
-                  backgroundColor={movie?.posterColor}
-                  showRating={false}
-                  onPress={() => navigation.navigate('MovieDetails', { movieTitle })}
-                />
-                <View style={styles.reviewInfo}>
-                  <Text style={styles.title}>{movieTitle}</Text>
-                  <RatingStars value={review.rating} size={18} />
-                  <Text style={styles.reviewText}>{review.content}</Text>
-                </View>
-              </View>
+              <ReviewCard key={review.id} variant="withMovie" review={review} movieTitle={movieTitle} posterUrl={movie?.posterUrl}
+                onMoviePress={() => navigation.navigate('MovieDetails', { movieId: movie?.id ?? review.movie_id, movieTitle })} />
             );
           })}
-        </ScrollView>
+        </View>
       )}
     </CineaScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  pageContent: {
-    paddingTop: 20,
-    gap: spacing.md,
-  },
-  list: {
-    gap: spacing.md,
-    paddingBottom: spacing.md,
-  },
-  reviewRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    alignItems: 'flex-start',
-    paddingBottom: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: '#B28B70',
-  },
-  reviewInfo: {
-    flex: 1,
-    gap: 6,
-  },
-  title: {
-    color: colors.text,
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  reviewText: {
-    color: colors.text,
-    fontSize: 16,
-    lineHeight: 22,
-  },
-  status: {
-    marginTop: spacing.md,
-    color: colors.text,
-    fontSize: 16,
-  },
+  pageContent: { gap: semanticSpacing.xxl },
+  list: { gap: semanticSpacing.xs },
 });

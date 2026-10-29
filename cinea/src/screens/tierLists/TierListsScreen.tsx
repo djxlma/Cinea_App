@@ -1,17 +1,21 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { Alert, Pressable, ScrollView, Share, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { CineaScreen } from '../../components/CineaScreen';
-import { CineaIcon } from '../../components/CineaIcon';
 import { PosterTile } from '../../components/PosterTile';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { TierRow } from '../../components/TierRow';
-import { demoMovies } from '../../data/mock/demoContent';
+import { useReviewMovies as useItemMovies } from '../../hooks/useReviewMovies';
+import { getMovieIdentityKey } from '../../services/movieResolver';
 import { deleteTierList, getCurrentUserTierLists, getTierListItems, type TierListItemRecord, type TierListRecord } from '../../services/tierLists';
 import type { TierRank } from '../../types/content';
-import { colors } from '../../tokens/colors';
-import { spacing } from '../../tokens/spacing';
+import { semanticColors } from '../../tokens/colors';
+import { CineaIconButton } from '../../components/CineaIconButton';
+import { CineaState } from '../../components/CineaState';
+import { useTierListExport } from '../../hooks/useTierListExport';
+import { semanticTypography } from '../../tokens/typography';
+import { semanticSpacing } from '../../tokens/spacing';
 import type { AppTabScreenProps } from '../../types/navigation';
 
 type Props = AppTabScreenProps<'TierLists'>;
@@ -23,15 +27,20 @@ export function TierListsScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const { width } = useWindowDimensions();
+  const movies = useItemMovies(items);
+  const selectedRef = useRef<string | null>(null);
+  const requestId = useRef(0);
+  const exporter = useTierListExport();
   const boardPosterWidth = 58;
   const boardPosterHeight = 86;
 
   const loadTierLists = useCallback(async () => {
+    const currentRequest = ++requestId.current;
     try {
       setLoading(true);
       setError(null);
       const userTierLists = await getCurrentUserTierLists();
+      if (currentRequest !== requestId.current) return;
       setTierLists(userTierLists);
 
       if (userTierLists.length === 0) {
@@ -40,23 +49,26 @@ export function TierListsScreen({ navigation }: Props) {
         return;
       }
 
-      const nextSelected = userTierLists.find((list) => list.id === selectedTierListId)?.id ?? userTierLists[0].id;
+      const nextSelected = userTierLists.find((list) => list.id === selectedRef.current)?.id ?? userTierLists[0].id;
+      selectedRef.current = nextSelected;
       setSelectedTierListId(nextSelected);
 
       const tierListItems = await getTierListItems(nextSelected);
-      setItems(tierListItems);
+      if (currentRequest === requestId.current) setItems(tierListItems);
     } catch (e) {
+      if (currentRequest !== requestId.current) return;
       setError('Não foi possível carregar as suas Tier Lists.');
       setTierLists([]);
       setSelectedTierListId(null);
       setItems([]);
     } finally {
-      setLoading(false);
+      if (currentRequest === requestId.current) setLoading(false);
     }
-  }, [selectedTierListId]);
+  }, []);
 
   useFocusEffect(useCallback(() => {
     void loadTierLists();
+    return () => { requestId.current++; };
   }, [loadTierLists]));
 
   const selectedTierList = tierLists.find((list) => list.id === selectedTierListId) ?? null;
@@ -93,212 +105,80 @@ export function TierListsScreen({ navigation }: Props) {
     );
   }, [loadTierLists, selectedTierList]);
 
-  const footer = tierLists.length === 0
-    ? (
-      <PrimaryButton
-        label="+ Nova"
-        onPress={() => navigation.navigate('CreateEditTierList', {})}
-        containerStyle={styles.footerButton}
-      />
-    )
-    : (
-      <View style={styles.footerRow}>
-        <PrimaryButton
-          label="+ Nova"
-          variant="orange"
-          onPress={() => navigation.navigate('CreateEditTierList', {})}
-          containerStyle={[styles.footerButton, styles.footerPrimary]}
-        />
-        <PrimaryButton
-          label="Exportar"
-          onPress={() => void Share.share({ message: selectedTierList?.title ?? 'Minha Tier List' })}
-          containerStyle={[styles.footerButton, styles.footerSecondary]}
-        />
+  const exportSelected = () => {
+    if (!selectedTierList) return;
+    void exporter.exportTierList({ title: selectedTierList.title, description: selectedTierList.description, movies,
+      items: items.map((item) => ({ id: item.id, movieId: item.movie_id, movieTitle: item.movie_title, tier: item.tier, position: item.position })) });
+  };
+
+  return <>
+    <CineaScreen appearance="semantic" contentContainerStyle={styles.content} bottomContent={tierLists.length && !loading && !error ? (
+      <View style={styles.actions}>
+        <PrimaryButton label="+ Nova" variant="primary" onPress={() => navigation.navigate('CreateEditTierList', {})} containerStyle={styles.action} />
+        <PrimaryButton label="Exportar" variant="secondary" secondaryTone="wine" loading={exporter.isExporting}
+          disabled={!selectedTierList || Boolean(deletingId)} onPress={exportSelected} containerStyle={styles.action} />
       </View>
-    );
-
-  return (
-    <CineaScreen
-      contentContainerStyle={styles.content}
-      footer={footer}
-    >
-      <ScreenHeader title="Tier List" onBack={() => navigation.goBack()} />
-      {loading ? (
-        <Text style={styles.emptyText}>Carregando Tier Lists...</Text>
-      ) : error ? (
-        <Text style={styles.emptyText}>{error}</Text>
-      ) : tierLists.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>Você ainda não criou uma Tier List.</Text>
-        </View>
-      ) : (
-        <View style={styles.stack}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-            {tierLists.map((list) => (
-              <Pressable
-                key={list.id}
-                accessibilityRole="button"
-                accessibilityLabel={`Selecionar Tier List ${list.title}`}
-                onPress={() => setSelectedTierListId(list.id)}
-                style={[styles.chip, list.id === selectedTierListId && styles.chipActive]}
-              >
-                <Text style={[styles.chipText, list.id === selectedTierListId && styles.chipTextActive]}>{list.title}</Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-
-          <View style={styles.listTitleRow}>
-            <Text style={styles.listTitle} numberOfLines={1}>{selectedTierList?.title ?? 'Tier List'}</Text>
-            <View style={styles.listTitleActions}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Editar Tier List"
-                onPress={() => selectedTierList && navigation.navigate('CreateEditTierList', { tierListId: selectedTierList.id })}
-                style={styles.iconButton}
-              >
-                <CineaIcon name="edit" size={20} />
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Excluir Tier List"
-                onPress={handleDeleteSelectedTierList}
-                disabled={deletingId === selectedTierList?.id}
-                style={[styles.iconButton, styles.deleteButton, deletingId === selectedTierList?.id && styles.iconButtonDisabled]}
-              >
-                <CineaIcon name="trash" size={18} color={deletingId === selectedTierList?.id ? '#9C8C7B' : '#F7F0DF'} />
-              </Pressable>
+    ) : undefined}>
+      <ScreenHeader appearance="semantic" title="Tier Lists" onBack={() => navigation.goBack()} />
+      {loading ? <CineaState variant="loading" message="Carregando Tier Lists..." />
+        : error ? <CineaState variant="error" message={error} actionLabel="Tentar novamente" onAction={() => void loadTierLists()} />
+        : !tierLists.length ? <CineaState variant="empty" size="screen" title="Nenhuma Tier List ainda" actionLabel="Criar Tier List" onAction={() => navigation.navigate('CreateEditTierList', {})} />
+        : <View style={styles.stack}>
+          <Text style={styles.label}>Suas listas</Text>
+          <View>
+            {tierLists.map((list) => <Pressable key={list.id} accessibilityRole="button"
+              accessibilityLabel={`Abrir Tier List ${list.title}`} accessibilityState={{ selected: list.id === selectedTierListId }}
+              onPress={() => { selectedRef.current = list.id; void loadTierLists(); }}
+              style={({ pressed }) => [styles.listRow, pressed && styles.pressed]}>
+              <View style={styles.listInfo}>
+                <Text style={[styles.listName, list.id === selectedTierListId && styles.selectedName]}>{list.title}</Text>
+                {list.description ? <Text style={styles.metadata} numberOfLines={2}>{list.description}</Text> : null}
+                {list.id === selectedTierListId ? <Text style={styles.metadata}>{items.length} {items.length === 1 ? 'filme' : 'filmes'} · Selecionada</Text> : null}
+              </View>
+              <Text accessible={false} style={styles.metadata}>›</Text>
+            </Pressable>)}
+          </View>
+          <View>
+            <View style={styles.heading}>
+              <Text accessibilityRole="header" style={styles.title}>{selectedTierList?.title}</Text>
+              <CineaIconButton icon="edit" accessibilityLabel="Editar Tier List" onPress={() => selectedTierList && navigation.navigate('CreateEditTierList', { tierListId: selectedTierList.id })} />
+              <CineaIconButton icon="trash" variant="danger" accessibilityLabel="Excluir Tier List" loading={deletingId === selectedTierList?.id} onPress={handleDeleteSelectedTierList} />
             </View>
+            {selectedTierList?.description ? <Text style={styles.metadata}>{selectedTierList.description}</Text> : null}
           </View>
-
           <View style={styles.tiers}>
-            {(['S', 'A', 'B', 'C', 'D'] as const).map((rank: TierRank, index) => (
-              <TierRow key={rank} rank={rank}>
-                {boardItems[index].map((item) => {
-                  const movie = demoMovies.find((entry) => entry.id === item.movie_id);
-                  return (
-                    <PosterTile
-                      key={`${item.tier_list_id}-${item.movie_id}`}
-                      width={boardPosterWidth}
-                      height={boardPosterHeight}
-                      posterSource={movie?.posterSource ?? require('../../../assets/poster-placeholder.png')}
-                      backgroundColor={movie?.posterColor ?? '#5D0000'}
-                      showRating={false}
-                    />
-                  );
-                })}
-              </TierRow>
-            ))}
+            {(['S', 'A', 'B', 'C', 'D'] as const).map((rank, index) => <TierRow appearance="semantic" key={rank} rank={rank}>
+              {boardItems[index].map((item) => {
+                const movie = movies[getMovieIdentityKey(item.movie_id)];
+                return <View key={item.id} style={{ width: boardPosterWidth }}>
+                  <PosterTile appearance="semantic" width={boardPosterWidth} height={boardPosterHeight} posterUrl={movie?.posterUrl} showRating={false} />
+                  <Text numberOfLines={2} style={styles.itemTitle}>{movie?.title?.trim() || item.movie_title}</Text>
+                </View>;
+              })}
+            </TierRow>)}
           </View>
-        </View>
-      )}
+        </View>}
+      {exporter.error ? <Text accessibilityRole="alert" style={styles.error}>{exporter.error}</Text> : null}
     </CineaScreen>
-  );
+    {exporter.exportView}
+  </>;
 }
 
 const styles = StyleSheet.create({
-  content: {
-    paddingTop: 14,
-    paddingBottom: 24,
-  },
-  stack: {
-    gap: 12,
-  },
-  chipRow: {
-    paddingVertical: 2,
-    gap: spacing.xs,
-    alignItems: 'center',
-    flexGrow: 0,
-  },
-  chip: {
-    minHeight: 36,
-    flexShrink: 0,
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: '#3A120E',
-    borderWidth: 1,
-    borderColor: '#B28B70',
-  },
-  chipActive: {
-    backgroundColor: colors.secondary,
-    borderColor: colors.secondary,
-  },
-  chipText: {
-    color: colors.text,
-    fontSize: 12,
-    fontWeight: '600',
-    lineHeight: 16,
-  },
-  chipTextActive: {
-    color: colors.primary,
-  },
-  listTitleRow: {
-    minHeight: 42,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-    marginTop: 0,
-    marginBottom: 0,
-  },
-  listTitle: {
-    flex: 1,
-    color: colors.text,
-    fontSize: 20,
-    fontWeight: '600',
-  },
-  listTitleActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flexShrink: 0,
-  },
-  iconButton: {
-    minWidth: 34,
-    minHeight: 34,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 999,
-    padding: 6,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-  },
-  deleteButton: {
-    backgroundColor: 'rgba(203, 83, 58, 0.18)',
-  },
-  iconButtonDisabled: {
-    opacity: 0.6,
-  },
-  tiers: {
-    gap: 0,
-  },
-  emptyState: {
-    minHeight: 120,
-    justifyContent: 'center',
-  },
-  emptyText: {
-    color: colors.text,
-    fontSize: 16,
-  },
-  footerRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: 12,
-    paddingBottom: 8,
-  },
-  footerButton: {
-    flex: 1,
-    minHeight: 54,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 999,
-  },
-  footerPrimary: {
-    minHeight: 54,
-  },
-  footerSecondary: {
-    minHeight: 54,
-  },
+  content: { gap: semanticSpacing.xl },
+  stack: { gap: semanticSpacing.xl },
+  label: { ...semanticTypography.label, color: semanticColors.text.secondary },
+  listRow: { flexDirection: 'row', alignItems: 'center', gap: semanticSpacing.md, minHeight: 64, paddingVertical: semanticSpacing.md, borderBottomWidth: 1, borderColor: semanticColors.border.subtle },
+  listInfo: { flex: 1, gap: semanticSpacing.xs },
+  listName: { ...semanticTypography.label, color: semanticColors.text.primary },
+  selectedName: { color: semanticColors.brand.amber },
+  metadata: { ...semanticTypography.bodySmall, color: semanticColors.text.secondary },
+  heading: { flexDirection: 'row', alignItems: 'center', gap: semanticSpacing.xs },
+  title: { ...semanticTypography.sectionTitle, color: semanticColors.text.primary, flex: 1 },
+  tiers: { gap: semanticSpacing.sm },
+  itemTitle: { ...semanticTypography.caption, color: semanticColors.text.primary, marginTop: semanticSpacing.xs },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: semanticSpacing.sm },
+  action: { flex: 1, minWidth: 120 },
+  pressed: { backgroundColor: semanticColors.surface.sunken },
+  error: { ...semanticTypography.bodySmall, color: semanticColors.feedback.danger.text },
 });
-
-

@@ -1,25 +1,28 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { colors } from '../tokens/colors';
+import { colors, semanticColors } from '../tokens/colors';
 import { spacing } from '../tokens/spacing';
-import { typography } from '../tokens/typography';
+import { typography, semanticTypography } from '../tokens/typography';
 
 type SectionTitleProps = {
+  appearance?: 'legacy' | 'semantic';
   title: string;
   subtitle?: string;
   size?: 'large' | 'medium' | 'small';
   align?: 'left' | 'center';
 };
 
-export function SectionTitle({ title, subtitle, size = 'medium', align = 'left' }: SectionTitleProps) {
+export function SectionTitle({ appearance = 'legacy', title, subtitle, size = 'medium', align = 'left' }: SectionTitleProps) {
   return (
     <View style={[styles.container, align === 'center' && styles.center]}>
-      <Text style={[styles.title, styles[size]]} accessibilityRole="header">{title}</Text>
-      {subtitle ? <Text style={[styles.subtitle, align === 'center' && styles.centerText]}>{subtitle}</Text> : null}
+      <Text style={appearance === 'semantic' ? styles.semanticTitle : [styles.title, styles[size]]} accessibilityRole="header">{title}</Text>
+      {subtitle ? <Text style={[appearance === 'semantic' ? styles.semanticSubtitle : styles.subtitle, align === 'center' && styles.centerText]}>{subtitle}</Text> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  semanticTitle: { ...semanticTypography.sectionTitle, color: semanticColors.text.primary },
+  semanticSubtitle: { ...semanticTypography.bodySmall, color: semanticColors.text.secondary },
   container: {
     gap: spacing.xs,
   },

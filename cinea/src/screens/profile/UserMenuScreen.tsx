@@ -1,134 +1,111 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ImageBackground, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { CineaIcon } from '../../components/CineaIcon';
+import { CineaScreen } from '../../components/CineaScreen';
+import { ScreenHeader } from '../../components/ScreenHeader';
+import { SectionTitle } from '../../components/SectionTitle';
+import { AccountMenuRow } from '../../components/AccountMenuRow';
 import { UserAvatar } from '../../components/UserAvatar';
 import { getCurrentProfile, getSignedAvatarUrl, type ProfileRecord } from '../../services/profile';
 import { supabase } from '../../lib/supabase';
-import { colors } from '../../tokens/colors';
-import { spacing } from '../../tokens/spacing';
+import { semanticColors } from '../../tokens/colors';
+import { semanticSpacing } from '../../tokens/spacing';
+import { semanticTypography } from '../../tokens/typography';
+import { states } from '../../tokens/states';
+import { radius } from '../../tokens/radius';
+import { useAccountLogout } from '../../hooks/useAccountLogout';
 import type { RootScreenProps } from '../../types/navigation';
 
-type Props = RootScreenProps<'UserMenu'> & { onLogout: () => Promise<void> | void };
+type Props = RootScreenProps<'UserMenu'>;
 
-export function UserMenuScreen({ navigation, onLogout }: Props) {
+export function UserMenuScreen({ navigation }: Props) {
+  const { logout, isLoggingOut, logoutError } = useAccountLogout();
   const [profile, setProfile] = useState<ProfileRecord | null>(null);
   const [email, setEmail] = useState('');
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
 
-  const loadProfile = useCallback(async () => {
+  const loadProfile = useCallback(async (isActive: () => boolean) => {
     try {
       const currentProfile = await getCurrentProfile();
+      if (!isActive()) return;
       setProfile(currentProfile);
-      setAvatarUri(await getSignedAvatarUrl(currentProfile?.avatar_url ?? null));
+      const uri = await getSignedAvatarUrl(currentProfile?.avatar_url ?? null);
+      if (isActive()) setAvatarUri(uri);
     } catch (error) {
+      if (!isActive()) return;
       setProfile(null);
       setAvatarUri(null);
     }
   }, []);
 
   useEffect(() => {
+    let active = true;
     async function loadAuthEmail() {
       const { data } = await supabase.auth.getUser();
-      setEmail(data.user?.email ?? '');
+      if (active) setEmail(data.user?.email ?? '');
     }
 
-    void loadAuthEmail();
+    void loadAuthEmail().catch(() => {});
+    return () => { active = false; };
   }, []);
 
   useFocusEffect(useCallback(() => {
-    void loadProfile();
+    let active = true;
+    void loadProfile(() => active);
+    return () => { active = false; };
   }, [loadProfile]));
 
-  const goToProfile = () => navigation.navigate('App', { screen: 'Profile' });
+  const goToProfile = () => navigation.navigate('AccountProfile');
   const goToTierLists = () => navigation.navigate('App', { screen: 'TierLists' });
   const displayName = profile?.display_name?.trim() || 'Usuário';
   const username = profile?.username?.trim() || email.split('@')[0]?.replace(/[^a-zA-Z0-9._-]/g, '') || 'usuario';
 
   return (
-    <ImageBackground
-      source={require('../../../design-reference/Tela Inicial.png')}
-      blurRadius={12}
-      resizeMode="cover"
-      style={styles.background}
-    >
-      <View style={styles.dim}>
-        <View style={styles.topRow}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Fechar menu" onPress={() => navigation.goBack()} style={styles.back}>
-            <CineaIcon name="back" size={34} />
-          </Pressable>
-          <UserAvatar size={47} source={avatarUri ? { uri: avatarUri } : null} onPress={() => navigation.goBack()} />
+    <CineaScreen appearance="semantic" maxContentWidth={560} contentContainerStyle={styles.content}>
+      <ScreenHeader appearance="semantic" title="Minha conta" onBack={() => navigation.goBack()} />
+      <Pressable accessibilityRole="button" accessibilityLabel={`Meu Perfil, ${displayName}, @${username}`} onPress={goToProfile}
+        style={({ pressed }) => [styles.identity, pressed && styles.pressed]}>
+        <UserAvatar size={64} source={avatarUri ? { uri: avatarUri } : null} />
+        <View style={styles.identityText}>
+          <Text style={styles.name}>{displayName}</Text>
+          <Text style={styles.username}>@{username}</Text>
         </View>
-        <Text style={styles.name}>{displayName}</Text>
-        <View style={styles.menu}>
-          <MenuItem label="Editar perfil" onPress={goToProfile} />
-          <MenuItem label="Avaliações publicadas" onPress={() => navigation.navigate('CurrentUserReviews')} />
-          <MenuItem label="Fazer uma avaliação" onPress={() => navigation.navigate('SelectMovieForReview')} />
-          <MenuItem label="Fazer Tier List" onPress={goToTierLists} />
-          <MenuItem label="Conexões" inactive />
-          <MenuItem label="Configurações do aplicativo" inactive />
-          <MenuItem label="Sair" onPress={() => void onLogout()} />
+      </Pressable>
+      <View style={styles.group}>
+        <SectionTitle appearance="semantic" title="Conta" />
+        <View>
+          <AccountMenuRow icon="user" label="Meu Perfil" onPress={goToProfile} />
+          <AccountMenuRow icon="filter" label="Configurações do aplicativo" onPress={() => navigation.navigate('Settings')} />
         </View>
       </View>
-    </ImageBackground>
-  );
-}
-
-type MenuItemProps = {
-  label: string;
-  onPress?: () => void;
-  inactive?: boolean;
-};
-
-function MenuItem({ label, onPress, inactive = false }: MenuItemProps) {
-  return (
-    <Pressable accessibilityRole="button" disabled={inactive} onPress={onPress} style={styles.menuItem}>
-      <Text style={styles.menuLabel}>{label}</Text>
-    </Pressable>
+      <View style={styles.group}>
+        <SectionTitle appearance="semantic" title="Atividade" />
+        <View>
+          <AccountMenuRow icon="star" label="Avaliações publicadas" onPress={() => navigation.navigate('CurrentUserReviews')} />
+          <AccountMenuRow icon="edit" label="Fazer uma avaliação" onPress={() => navigation.navigate('SelectMovieForReview')} />
+          <AccountMenuRow icon="plus" label="Fazer Tier List" onPress={goToTierLists} />
+        </View>
+      </View>
+      <View style={styles.group}>
+        <SectionTitle appearance="semantic" title="Social" />
+        <AccountMenuRow icon="user" label="Conexões" description="Em breve" disabled />
+      </View>
+      <View style={styles.group}>
+        <SectionTitle appearance="semantic" title="Sessão" />
+        <AccountMenuRow icon="back" danger showChevron={false} label={isLoggingOut ? 'Saindo...' : 'Sair'} loading={isLoggingOut} disabled={isLoggingOut} onPress={() => void logout()} />
+        {logoutError ? <Text accessibilityRole="alert" style={styles.error}>{logoutError}</Text> : null}
+      </View>
+    </CineaScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  background: {
-    flex: 1,
-  },
-  dim: {
-    flex: 1,
-    paddingHorizontal: '9.45%',
-    paddingTop: 22,
-    backgroundColor: 'rgba(43, 7, 5, 0.52)',
-  },
-  topRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  back: {
-    width: 40,
-    height: 48,
-    justifyContent: 'center',
-  },
-  name: {
-    marginTop: 8,
-    color: colors.text,
-    fontSize: 34,
-    fontWeight: '700',
-    textAlign: 'right',
-  },
-  menu: {
-    alignItems: 'flex-end',
-    gap: spacing.sm,
-    marginTop: 26,
-  },
-  menuItem: {
-    minHeight: 40,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-  },
-  menuLabel: {
-    color: colors.text,
-    fontSize: 20,
-    textAlign: 'right',
-  },
+  content: { gap: semanticSpacing.section },
+  identity: { flexDirection: 'row', alignItems: 'center', gap: semanticSpacing.lg, paddingVertical: semanticSpacing.sm, borderRadius: radius.control },
+  identityText: { flex: 1, minWidth: 0, gap: semanticSpacing.xs },
+  name: { ...semanticTypography.sectionTitle, color: semanticColors.text.primary },
+  username: { ...semanticTypography.bodySmall, color: semanticColors.text.secondary },
+  group: { gap: semanticSpacing.sm },
+  pressed: { backgroundColor: states.pressed.background },
+  error: { ...semanticTypography.bodySmall, color: states.danger.text },
 });
